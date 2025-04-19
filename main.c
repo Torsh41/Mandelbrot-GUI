@@ -6,8 +6,6 @@
 #include <string.h>
 #include <math.h>
 
-#include "util.h"
-
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 800
 
@@ -30,9 +28,9 @@ const char *fragment_shader =
 GLSL_VERSION
 "in vec3 Texcoord;"
 "out vec4 outColor;"
-"uniform sampler2DArray canvas;"
+"uniform sampler2DArray chunk;"
 "void main() {"
-"   outColor = texture(canvas, Texcoord).rrrr;"
+"   outColor = texture(chunk, Texcoord).rrrr;"
 "}";
 
 #define GL_ERROR_PRINT() \
@@ -43,6 +41,9 @@ GLSL_VERSION
 
 
 GLuint compile_shader_program(const char *vertex_code, const char *fragment_code);
+void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk);
+GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
+
 
 static void glfw_error_callback(int e, const char *d) {
     fprintf(stderr, "Error %d: %s\n", e, d);
@@ -77,25 +78,26 @@ int main() {
     // The textures are mostly persistent in memory. The shaders will have to
     // only draw these textures in a location specified by vertices
     int grid[GRID_WIDTH*GRID_HEIGHT];
-    GLsizei width = 3;
-    GLsizei height = 3;
-    GLsizei canvas_count = 1;
-    GLfloat pixels[] = {
-        1.0, 0.0, 1.0, 
-        0.0, 1.0, 0.0, 
-        1.0, 0.0, 1.0, 
+    GLsizei width = 1000;
+    GLsizei height = 1000;
+    GLsizei chunk_count = 1;
+    GLfloat pixels[1000*1000];
+    GLfloat chunk_position_rect[] = {
+        -2.0f, -1.0f, 0.4f, 1.0f,
     };
-    GLuint canvas;
-    glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &canvas);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, canvas);
-    glTextureStorage3D(canvas, 1, GL_R32F, width, height, canvas_count);
-    glTextureSubImage3D(canvas, 0, 0, 0, 0, width, height, canvas_count, GL_RED, GL_FLOAT, &pixels[0]);
+    compute_mandelbrot_chunk(&chunk_position_rect[0], width, height, &pixels[0]);
 
-    glTextureParameteri(canvas, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(canvas, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(canvas, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTextureParameteri(canvas, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    GLuint chunk;
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &chunk);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, chunk);
+    glTextureStorage3D(chunk, 1, GL_R32F, width, height, chunk_count);
+    glTextureSubImage3D(chunk, 0, 0, 0, 0, width, height, chunk_count, GL_RED, GL_FLOAT, &pixels[0]);
+
+    glTextureParameteri(chunk, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(chunk, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(chunk, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(chunk, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     /* glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, { 1.0f, 0.0f, 0.0f, 1.0f }); */
     // TODO: use a texture mipmap instead
@@ -128,7 +130,7 @@ int main() {
     glEnableVertexAttribArray(texcoord_attribute);
     glVertexAttribPointer(texcoord_attribute, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
 
-    glUniform1i(glGetUniformLocation(program, "canvas"), 0);
+    glUniform1i(glGetUniformLocation(program, "chunk"), 0);
 
     int i = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -149,7 +151,7 @@ int main() {
         }
     }
 
-    glDeleteTextures(1, &canvas);
+    glDeleteTextures(1, &chunk);
 
     glDeleteProgram(program);
     glDeleteBuffers(1, &vertexbuffer);
@@ -214,4 +216,35 @@ GLuint compile_shader_program(const char *vertex_code, const char *fragment_code
 	glDeleteShader(vertex_id);
 	glDeleteShader(fragment_id);
     return program_id;
+}
+
+
+void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk) {
+    GLfloat step_x = (position_rect[2] - position_rect[0]) / width;
+    GLfloat step_y = (position_rect[3] - position_rect[1]) / height;
+    for (int i = 0; i < height; i++) {
+        GLfloat y =  position_rect[1] + (i + 0.5) * step_y;
+        for (int j = 0; j < width; j++) {
+            GLfloat x =  position_rect[0] + (j + 0.5) * step_x; // 0.5 to center the integration
+            chunk[i * width + j] = compute_mandelbrot(x, y);
+        }
+    }
+}
+
+#define DEPTH 500
+GLfloat compute_mandelbrot(GLfloat x, GLfloat xi) {
+    float z = 0.0;
+    float zi = 0.0;
+    for (int i = 1; i < DEPTH; i++) {
+        float zprev = z;
+        z = z * z - zi * zi;
+        zi = 2 * zprev * zi;
+        if (z * z + zi * zi < 4) {
+            z += x;
+            zi += xi;
+        } else {
+            return 1.0f;
+        }
+    }
+    return 0.0f;
 }
