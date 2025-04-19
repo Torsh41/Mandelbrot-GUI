@@ -23,12 +23,13 @@ CC = gcc
 CFLAGS += -I./
 CFLAGS += -std=c11 -Wall -Wextra -pedantic -Wno-unused-function -O2 \
 	-fno-strict-aliasing -march=native -DONLINE_JUDGE -static -Wl,-s,--stack=67108864 \
-	-Wold-style-cast -g
+	-g
+CFLAGS += -Wno-implicit-function-declaration
 # CFLAGS += -x c++ -std=c++23 -O2 -fno-strict-aliasing -march=native \
 #     -DONLINE_JUDGE -static -Wl,-s,--stack=67108864
 
 
-LDLIBS = -lglfw -lvulkan -lm
+LDLIBS = -lglfw -lGL -lm
 
 
 SOURCEDIR = ./
