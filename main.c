@@ -19,15 +19,20 @@
 const char *vertex_shader =
 GLSL_VERSION
 "in vec2 position;"
+"in vec3 texcoord;"
+"out vec3 Texcoord;"
 "void main() {"
-"    gl_Position = vec4(position, 0.0, 1.0);"
+"   Texcoord = texcoord;"
+"   gl_Position = vec4(position, 0.0, 1.0);"
 "}";
 
 const char *fragment_shader =
 GLSL_VERSION
+"in vec3 Texcoord;"
 "out vec4 outColor;"
+"uniform sampler2DArray canvas;"
 "void main() {"
-"    outColor = vec4(1.0, 1.0, 1.0, 1.0);"
+"   outColor = texture(canvas, Texcoord).rrrr;"
 "}";
 
 #define GL_ERROR_PRINT() \
@@ -67,21 +72,41 @@ int main() {
     glfwSwapInterval(1); // enable vsync
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    // Generate grid of vertices
-    // To generate the grid of vertices, we pass grid_size and grid_location to the vertex shader
-    // then the shader generates hovewer many vertices in range from -1 to 1
-    //
-    // Maybe, pass 4 boundary vertices, then do tesselation N times, or geometric shader
-
-    // New idea:
-    // Generate a cachable "image" in batches of set size, like on the website.
-    // Do not update the "image" on every event, use cache instead.
+    // New New idea:
+    // Generate a pool of textures, then draw stuff onto them pixel by pixel.
+    // The textures are mostly persistent in memory. The shaders will have to
+    // only draw these textures in a location specified by vertices
     int grid[GRID_WIDTH*GRID_HEIGHT];
+    GLsizei width = 3;
+    GLsizei height = 3;
+    GLsizei canvas_count = 1;
+    GLfloat pixels[] = {
+        1.0, 0.0, 1.0, 
+        0.0, 1.0, 0.0, 
+        1.0, 0.0, 1.0, 
+    };
+    GLuint canvas;
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &canvas);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, canvas);
+    glTextureStorage3D(canvas, 1, GL_R32F, width, height, canvas_count);
+    glTextureSubImage3D(canvas, 0, 0, 0, 0, width, height, canvas_count, GL_RED, GL_FLOAT, &pixels[0]);
+
+    glTextureParameteri(canvas, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(canvas, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(canvas, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(canvas, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    /* glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, { 1.0f, 0.0f, 0.0f, 1.0f }); */
+    // TODO: use a texture mipmap instead
 
     static const GLfloat g_vertex_buffer_data[] = {
-        -1.0f, -1.0f, 0.0f,
-        1.0f, -1.0f, 0.0f,
-        0.0f,  1.0f, 0.0f,
+    //  Position        Texcoord
+    //      X      Y       Z      X      Y
+        -0.5f, -0.5f,   1.0f,  0.0f,  1.0f,
+         0.5f, -0.5f,   1.0f,  1.0f,  1.0f,
+         0.5f,  0.5f,   1.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f,   1.0f,  0.0f,  0.0f,
     };
 
     GLuint vertex_array;
@@ -92,34 +117,43 @@ int main() {
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
-    /* glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer); */
 
     GLuint program = compile_shader_program(vertex_shader, fragment_shader);
     glUseProgram(program);
 
     GLuint position_attribute = glGetAttribLocation(program, "position");
     glEnableVertexAttribArray(position_attribute);
-    glVertexAttribPointer(position_attribute, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
+    GLuint texcoord_attribute = glGetAttribLocation(program, "texcoord");
+    glEnableVertexAttribArray(texcoord_attribute);
+    glVertexAttribPointer(texcoord_attribute, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+
+    glUniform1i(glGetUniformLocation(program, "canvas"), 0);
 
     int i = 0;
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        /* glDrawArrays(GL_POINTS, 0, 4); */
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         glfwSwapBuffers(window);
 
-        /* fprintf(stderr, "%d: %d %d\n", idx, width, height); */
-
         glfwPollEvents();
+        /* glfwWaitEvents(); */
         if (glfwGetKey(window, GLFW_KEY_Q ) == GLFW_PRESS) {
             break;
         }
-        /* glfwWaitEvents(); */
     }
+
+    glDeleteTextures(1, &canvas);
+
+    glDeleteProgram(program);
+    glDeleteBuffers(1, &vertexbuffer);
+    glDeleteVertexArrays(1, &vertex_array);
 
     glfwDestroyWindow(window);
     glfwTerminate();
