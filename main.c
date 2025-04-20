@@ -30,6 +30,11 @@ static void glfw_error_callback(int e, const char *d) {
     fprintf(stderr, "Error %d: %s\n", e, d);
 }
 
+static void window_size_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+}
+
+
 
 int main() {
     glfwSetErrorCallback(glfw_error_callback);
@@ -41,7 +46,7 @@ int main() {
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // We want OpenGL 3.3
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    /* glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); */
     GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT,
                                     "GLFW + OpenGL demo", NULL, NULL);
     if (!window) {
@@ -52,15 +57,15 @@ int main() {
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // enable vsync
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glfwSetWindowSizeCallback(window, window_size_callback);
 
     // New New idea:
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
     // The textures are mostly persistent in memory. The shaders will have to
     // only draw these textures in a location specified by vertices
     int grid[GRID_WIDTH*GRID_HEIGHT];
-    GLsizei width = 2;
-    GLsizei height = 2;
+    GLsizei chunk_width = 2;
+    GLsizei chunk_height = 2;
     GLsizei chunk_count = 4;
     GLfloat pixels[] = {
         1.0, 0.0,
@@ -78,19 +83,19 @@ int main() {
     GLfloat chunk_position_rect[] = {
         -2.0f, -1.0f, 0.4f, 1.0f,
     };
-    /* compute_mandelbrot_chunk(&chunk_position_rect[0], width, height, &pixels[0]); */
+    /* compute_mandelbrot_chunk(&chunk_position_rect[0], chunk_width, chunk_height, &pixels[0]); */
 
-    GLuint chunk;
+    GLuint chunk_array;
     glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &chunk);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, chunk);
-    glTextureStorage3D(chunk, 1, GL_R32F, width, height, chunk_count);
-    glTextureSubImage3D(chunk, 0, 0, 0, 0, width, height, chunk_count, GL_RED, GL_FLOAT, &pixels[0]);
+    glGenTextures(1, &chunk_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, chunk_array);
+    glTextureStorage3D(chunk_array, 1, GL_R32F, chunk_width, chunk_height, chunk_count);
+    glTextureSubImage3D(chunk_array, 0, 0, 0, 0, chunk_width, chunk_height, chunk_count, GL_RED, GL_FLOAT, &pixels[0]);
 
-    glTextureParameteri(chunk, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(chunk, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(chunk, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTextureParameteri(chunk, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTextureParameteri(chunk_array, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(chunk_array, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(chunk_array, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(chunk_array, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     /* glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, { 1.0f, 0.0f, 0.0f, 1.0f }); */
     // TODO: use a texture mipmap instead
@@ -111,22 +116,28 @@ int main() {
 
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 
+    // Chunk program config
     GLuint chunk_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/chunk.vert");
     GLuint chunk_geometry_shader = create_shader_from_file(GL_GEOMETRY_SHADER, "shaders/chunk.geom");
     GLuint chunk_fragment_shader = create_shader_from_file(GL_FRAGMENT_SHADER, "shaders/chunk.frag");
-    GLuint program = link_program(chunk_vertex_shader, chunk_geometry_shader, chunk_fragment_shader);
-    glUseProgram(program);
-
-    GLuint position_attribute = glGetAttribLocation(program, "position");
+    GLuint chunk_program = link_program(chunk_vertex_shader, chunk_geometry_shader, chunk_fragment_shader);
+    glUseProgram(chunk_program);
+    GLuint position_attribute = glGetAttribLocation(chunk_program, "position");
     glEnableVertexAttribArray(position_attribute);
     glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
-    GLuint chunk_index_attribute = glGetAttribLocation(program, "chunk_index");
+    GLuint chunk_index_attribute = glGetAttribLocation(chunk_program, "chunk_index");
     glEnableVertexAttribArray(chunk_index_attribute);
     glVertexAttribPointer(chunk_index_attribute, 1, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
+    GLuint chunk_array_attribute = glGetUniformLocation(chunk_program, "chunk_array");
+    glUniform1i(chunk_array_attribute, 0);
 
-    glUniform1i(glGetUniformLocation(program, "chunk"), 0);
+    // Axis program config
+    /* GLuint axis_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/axis.vert"); */
+    /* GLuint axis_fragment_shader = create_shader_from_file(GL_FRAGMENT_SHADER, "shaders/fragment.vert"); */
+    /* GLuint chunk_program = link_program(axis_vertex_shader, 0, axis_fragment_shader); */
+    /* glUseProgram(axis_program); */
 
     int i = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -147,9 +158,9 @@ int main() {
         }
     }
 
-    glDeleteTextures(1, &chunk);
+    glDeleteTextures(1, &chunk_array);
 
-    glDeleteProgram(program);
+    glDeleteProgram(chunk_program);
     glDeleteBuffers(1, &vertexbuffer);
     glDeleteVertexArrays(1, &vertex_array);
 
