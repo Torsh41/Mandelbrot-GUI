@@ -19,15 +19,10 @@
 }
 
 
-typedef struct Rect_s {
-    GLfloat x, y, w, h;
-} Rect;
-
-
 GLuint create_shader(GLenum type, const char *code);
 GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
-void compute_mandelbrot_chunk(Rect boundary, GLsizei width, GLsizei height, GLfloat *chunk);
+void compute_mandelbrot_chunk(const GLfloat boundary[4], GLsizei width, GLsizei height, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
 
 
@@ -84,11 +79,11 @@ int main() {
         1.0, 1.0,
         1.0, 1.0,
     };
-    Rect chunk_boundary = {
+    GLfloat chunk_boundary[4] = {
     //      X      Y     w     h
         -2.0f, -1.0f, 2.4f, 2.0f,
     };
-    compute_mandelbrot_chunk(chunk_boundary, chunk_width, chunk_height, &pixels[0]);
+    /* compute_mandelbrot_chunk(chunk_boundary, chunk_width, chunk_height, &pixels[0]); */
 
     GLuint chunk_array;
     glActiveTexture(GL_TEXTURE0);
@@ -263,13 +258,13 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 }
 
 
-void compute_mandelbrot_chunk(Rect boundary, GLsizei width, GLsizei height, GLfloat *chunk) {
-    GLfloat step_x = boundary.w / width;
-    GLfloat step_y = boundary.h / height;
+void compute_mandelbrot_chunk(const GLfloat boundary[4], GLsizei width, GLsizei height, GLfloat *chunk) {
+    GLfloat step_x = boundary[2] / width;
+    GLfloat step_y = boundary[3] / height;
     for (int i = 0; i < height; i++) {
-        GLfloat y =  boundary.y + (i + 0.5) * step_y;
+        GLfloat y =  boundary[1] + (i + 0.5) * step_y;
         for (int j = 0; j < width; j++) {
-            GLfloat x =  boundary.x + (j + 0.5) * step_x; // 0.5 to center the integration
+            GLfloat x =  boundary[0] + (j + 0.5) * step_x; // 0.5 to center the integration
             chunk[i * width + j] = compute_mandelbrot(x, y);
         }
     }
