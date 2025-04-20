@@ -19,10 +19,15 @@
 }
 
 
+typedef struct Rect_s {
+    GLfloat x, y, w, h;
+} Rect;
+
+
 GLuint create_shader(GLenum type, const char *code);
 GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
-void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk);
+void compute_mandelbrot_chunk(Rect boundary, GLsizei width, GLsizei height, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
 
 
@@ -63,7 +68,6 @@ int main() {
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
     // The textures are mostly persistent in memory. The shaders will have to
     // only draw these textures in a location specified by vertices
-    int grid[GRID_WIDTH*GRID_HEIGHT];
     GLsizei chunk_width = 2;
     GLsizei chunk_height = 2;
     GLsizei chunk_count = 4;
@@ -80,10 +84,11 @@ int main() {
         1.0, 1.0,
         1.0, 1.0,
     };
-    GLfloat chunk_position_rect[] = {
-        -2.0f, -1.0f, 0.4f, 1.0f,
+    Rect chunk_boundary = {
+    //      X      Y     w     h
+        -2.0f, -1.0f, 2.4f, 2.0f,
     };
-    /* compute_mandelbrot_chunk(&chunk_position_rect[0], chunk_width, chunk_height, &pixels[0]); */
+    compute_mandelbrot_chunk(chunk_boundary, chunk_width, chunk_height, &pixels[0]);
 
     GLuint chunk_array;
     glActiveTexture(GL_TEXTURE0);
@@ -258,13 +263,13 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 }
 
 
-void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk) {
-    GLfloat step_x = (position_rect[2] - position_rect[0]) / width;
-    GLfloat step_y = (position_rect[3] - position_rect[1]) / height;
+void compute_mandelbrot_chunk(Rect boundary, GLsizei width, GLsizei height, GLfloat *chunk) {
+    GLfloat step_x = boundary.w / width;
+    GLfloat step_y = boundary.h / height;
     for (int i = 0; i < height; i++) {
-        GLfloat y =  position_rect[1] + (i + 0.5) * step_y;
+        GLfloat y =  boundary.y + (i + 0.5) * step_y;
         for (int j = 0; j < width; j++) {
-            GLfloat x =  position_rect[0] + (j + 0.5) * step_x; // 0.5 to center the integration
+            GLfloat x =  boundary.x + (j + 0.5) * step_x; // 0.5 to center the integration
             chunk[i * width + j] = compute_mandelbrot(x, y);
         }
     }
