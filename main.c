@@ -63,7 +63,8 @@ GLSL_VERSION
 }
 
 
-GLuint compile_shader_program(const char *vertex_code, const char *geometry_code, const char *fragment_code);
+GLuint create_shader(GLenum type, const char *code);
+GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
 void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
 
@@ -116,7 +117,6 @@ int main() {
 
         1.0, 1.0,
         1.0, 1.0,
-
     };
     GLfloat chunk_position_rect[] = {
         -2.0f, -1.0f, 0.4f, 1.0f,
@@ -156,7 +156,10 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
-    GLuint program = compile_shader_program(vertex_shader, geometry_shader, fragment_shader);
+    GLuint chunk_vertex_shader = create_shader(GL_VERTEX_SHADER, vertex_shader);
+    GLuint chunk_geometry_shader = create_shader(GL_GEOMETRY_SHADER, geometry_shader);
+    GLuint chunk_fragment_shader = create_shader(GL_FRAGMENT_SHADER, fragment_shader);
+    GLuint program = link_program(chunk_vertex_shader, chunk_geometry_shader, chunk_fragment_shader);
     glUseProgram(program);
 
     GLuint position_attribute = glGetAttribLocation(program, "position");
@@ -201,71 +204,59 @@ int main() {
 }
 
 
-GLuint compile_shader_program(const char *vertex_code, const char *geometry_code, const char *fragment_code) {
+GLuint create_shader(GLenum type, const char *code) {
+    if (type == GL_VERTEX_SHADER) {
+        fprintf(stderr, "Compiling vertex shader :\n");
+    } else if (type == GL_GEOMETRY_SHADER) {
+        fprintf(stderr, "Compiling geometry shader :\n");
+    } else if (type == GL_FRAGMENT_SHADER) {
+        fprintf(stderr, "Compiling fragment shader :\n");
+    }
+    // Create shader
+    GLuint id = glCreateShader(type);
+    glShaderSource(id, 1, &code, NULL);
+    glCompileShader(id);
+    // Check errors
     GLuint status = GL_FALSE;
-    int log_length = 0;
-    int vertex_code_len = strlen(vertex_code);
-    int grometry_code_len = strlen(geometry_code);
-    int fragment_code_len = strlen(fragment_code);
-    GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
-    GLuint geometry_id = glCreateShader(GL_GEOMETRY_SHADER);
-    GLuint fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
-    // Compile shaders
-    fprintf(stderr, "Compiling vertex shader :\n");
-    glShaderSource(vertex_id, 1, &vertex_code, NULL);
-    glCompileShader(vertex_id);
-    glGetShaderiv(vertex_id, GL_COMPILE_STATUS, &status);
-    glGetShaderiv(vertex_id, GL_INFO_LOG_LENGTH, &log_length);
-    if (log_length > 0) {
-        char *log = (char*)malloc(sizeof(char) * log_length + 1);
-        glGetShaderInfoLog(vertex_id, log_length, NULL, log);
-        fprintf(stderr, "Compiling vertex shader : %s", log);
+    int length = 0;
+    glGetShaderiv(id, GL_COMPILE_STATUS, &status);
+    glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+    if (length > 0) {
+        char *log = (char*)malloc(sizeof(char) * length + 1);
+        glGetShaderInfoLog(id, length, NULL, log);
+        fprintf(stderr, "Compiling shader error log : %s", log);
         free(log);
     }
-    fprintf(stderr, "Compiling geometry shader :\n");
-    glShaderSource(geometry_id, 1, &geometry_code, NULL);
-    glCompileShader(geometry_id);
-    glGetShaderiv(geometry_id, GL_COMPILE_STATUS, &status);
-    glGetShaderiv(geometry_id, GL_INFO_LOG_LENGTH, &log_length);
-    if (log_length > 0) {
-        char *log = (char*)malloc(sizeof(char) * log_length + 1);
-        glGetShaderInfoLog(geometry_id, log_length, NULL, log);
-        fprintf(stderr, "Compiling geometry shader : %s", log);
-        free(log);
-    }
-    fprintf(stderr, "Compiling fragment shader :\n");
-    glShaderSource(fragment_id, 1, &fragment_code, NULL);
-    glCompileShader(fragment_id);
-    glGetShaderiv(fragment_id, GL_COMPILE_STATUS, &status);
-    glGetShaderiv(fragment_id, GL_INFO_LOG_LENGTH, &log_length);
-    if (log_length > 0) {
-        char *log = (char*)malloc(sizeof(char) * log_length + 1);
-        glGetShaderInfoLog(fragment_id, log_length, NULL, log);
-        fprintf(stderr, "Compiling fragment shader : %s", log);
-        free(log);
-    }
+    return id;
+}
+
+// If shader_id == 0, it is assumed that that shader is not used in the program
+GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
     // Link program
     GLuint program_id = glCreateProgram();
     fprintf(stderr, "Linking program :\n");
-    glAttachShader(program_id, vertex_id);
-    glAttachShader(program_id, geometry_id);
-    glAttachShader(program_id, fragment_id);
+    if (vertex_id   != 0) glAttachShader(program_id, vertex_id);
+    if (geometry_id != 0) glAttachShader(program_id, geometry_id);
+    if (fragment_id != 0) glAttachShader(program_id, fragment_id);
     glLinkProgram(program_id);
-
+    // Check errors
+    GLuint status = GL_FALSE;
+    int log_length = 0;
     glGetProgramiv(program_id, GL_LINK_STATUS, &status);
 	glGetProgramiv(program_id, GL_INFO_LOG_LENGTH, &log_length);
-	if ( log_length > 0 ){
+	if (log_length > 0){
         char *log = (char*)malloc(sizeof(char) * log_length + 1);
 		glGetProgramInfoLog(program_id, log_length, NULL, log);
         fprintf(stderr, "Linking program: %s", log);
         free(log);
 	}
     // Cleanup
-	glDetachShader(program_id, vertex_id);
-	glDetachShader(program_id, geometry_id);
-	glDetachShader(program_id, fragment_id);
-	glDeleteShader(vertex_id);
-	glDeleteShader(fragment_id);
+	if (vertex_id   != 0) glDetachShader(program_id, vertex_id);
+	if (geometry_id != 0) glDetachShader(program_id, geometry_id);
+	if (fragment_id != 0) glDetachShader(program_id, fragment_id);
+	if (vertex_id   != 0) glDeleteShader(vertex_id);
+	if (geometry_id != 0) glDeleteShader(geometry_id);
+	if (fragment_id != 0) glDeleteShader(fragment_id);
     return program_id;
 }
 
