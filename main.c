@@ -58,6 +58,7 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // enable vsync
     glfwSetWindowSizeCallback(window, window_size_callback);
+    Rect window_rect = { -1.8f, -1.0f, 2.4f, 2.0f };
 
     // New New idea:
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
@@ -139,6 +140,13 @@ int main() {
     /* GLuint chunk_program = link_program(axis_vertex_shader, 0, axis_fragment_shader); */
     /* glUseProgram(axis_program); */
 
+    enum key_pressed_idx {
+        KEY_QUIT,
+        KEY_ZOOM_IN,
+        KEY_ZOOM_OUT,
+        KEY_ACTION_COUNT
+    };
+    int key_pressed[KEY_ACTION_COUNT] = { 0 };
     int i = 0;
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);
@@ -153,9 +161,40 @@ int main() {
 
         glfwPollEvents();
         /* glfwWaitEvents(); */
-        if (glfwGetKey(window, GLFW_KEY_Q ) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
             break;
         }
+        if (glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS) {
+            if (!key_pressed[KEY_ZOOM_IN]) {
+                key_pressed[KEY_ZOOM_IN] = 1;
+                #define ZOOM_IN 0.2 // (1 out of 5)
+                GLfloat dx = ZOOM_IN * window_rect.w;
+                GLfloat dy = ZOOM_IN * window_rect.h;
+                window_rect.x += 0.5 * dx;
+                window_rect.y += 0.5 * dy;
+                window_rect.w -= dx;
+                window_rect.h -= dy;
+            }
+        } else {
+            key_pressed[KEY_ZOOM_IN] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) {
+            if (!key_pressed[KEY_ZOOM_OUT]) {
+                key_pressed[KEY_ZOOM_OUT] = 1;
+                #define ZOOM_OUT 0.25 // (1 out of 4)
+                GLfloat dx = ZOOM_OUT * window_rect.w;
+                GLfloat dy = ZOOM_OUT * window_rect.h;
+                window_rect.x -= 0.5 * dx;
+                window_rect.y -= 0.5 * dy;
+                window_rect.w += dx;
+                window_rect.h += dy;
+            }
+        } else {
+            key_pressed[KEY_ZOOM_OUT] = 0;
+        }
+        printf("%lf, %lf, %lf, %lf\n", window_rect.x, window_rect.y, window_rect.w, window_rect.h);
     }
 
     glDeleteTextures(1, &chunk_array);
