@@ -58,7 +58,7 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // enable vsync
     glfwSetWindowSizeCallback(window, window_size_callback);
-    Rect window_rect = { -1.8f, -1.0f, 2.4f, 2.0f };
+    GLfloat window_rect[4] = { -1.8f, -1.0f, 2.4f, 2.0f };
 
     // New New idea:
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
@@ -169,12 +169,12 @@ int main() {
             if (!key_pressed[KEY_ZOOM_IN]) {
                 key_pressed[KEY_ZOOM_IN] = 1;
                 #define ZOOM_IN 0.2 // (1 out of 5)
-                GLfloat dx = ZOOM_IN * window_rect.w;
-                GLfloat dy = ZOOM_IN * window_rect.h;
-                window_rect.x += 0.5 * dx;
-                window_rect.y += 0.5 * dy;
-                window_rect.w -= dx;
-                window_rect.h -= dy;
+                GLfloat dx = ZOOM_IN * window_rect[2];
+                GLfloat dy = ZOOM_IN * window_rect[3];
+                window_rect[0] += 0.5 * dx;
+                window_rect[1] += 0.5 * dy;
+                window_rect[2] -= dx;
+                window_rect[3] -= dy;
             }
         } else {
             key_pressed[KEY_ZOOM_IN] = 0;
@@ -184,17 +184,17 @@ int main() {
             if (!key_pressed[KEY_ZOOM_OUT]) {
                 key_pressed[KEY_ZOOM_OUT] = 1;
                 #define ZOOM_OUT 0.25 // (1 out of 4)
-                GLfloat dx = ZOOM_OUT * window_rect.w;
-                GLfloat dy = ZOOM_OUT * window_rect.h;
-                window_rect.x -= 0.5 * dx;
-                window_rect.y -= 0.5 * dy;
-                window_rect.w += dx;
-                window_rect.h += dy;
+                GLfloat dx = ZOOM_OUT * window_rect[2];
+                GLfloat dy = ZOOM_OUT * window_rect[3];
+                window_rect[0] -= 0.5 * dx;
+                window_rect[1] -= 0.5 * dy;
+                window_rect[2] += dx;
+                window_rect[3] += dy;
             }
         } else {
             key_pressed[KEY_ZOOM_OUT] = 0;
         }
-        printf("%lf, %lf, %lf, %lf\n", window_rect.x, window_rect.y, window_rect.w, window_rect.h);
+        /* printf("%lf, %lf, %lf, %lf\n", window_rect[0], window_rect[1], window_rect[2], window_rect[3]); */
     }
 
     glDeleteTextures(1, &chunk_array);
