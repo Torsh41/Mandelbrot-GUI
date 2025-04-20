@@ -17,20 +17,43 @@
 const char *vertex_shader =
 GLSL_VERSION
 "in vec2 position;"
-"in vec3 texcoord;"
-"out vec3 Texcoord;"
+"in float chunk_index;"
+"out float gChunkIndex;"
 "void main() {"
-"   Texcoord = texcoord;"
-"   gl_Position = vec4(position, 0.0, 1.0);"
+    "gChunkIndex = chunk_index;"
+    "gl_Position = vec4(position, 0.0, 1.0);"
+"}";
+
+const char *geometry_shader =
+GLSL_VERSION
+"layout (points) in;"
+"layout (triangle_strip, max_vertices = 4) out;"
+"in float gChunkIndex[];"
+"out vec3 fTexcoord;"
+"void main() {"
+    "const float offset = 0.3;"
+    "gl_Position = gl_in[0].gl_Position + vec4(-offset, -offset, 0.0, 0.0);"
+    "fTexcoord = vec3(0.0, 1.0, gChunkIndex[0]);"
+    "EmitVertex();"
+    "gl_Position = gl_in[0].gl_Position + vec4(-offset, offset, 0.0, 0.0);"
+    "fTexcoord = vec3(0.0, 0.0, gChunkIndex[0]);"
+    "EmitVertex();"
+    "gl_Position = gl_in[0].gl_Position + vec4(offset, -offset, 0.0, 0.0);"
+    "fTexcoord = vec3(1.0, 1.0, gChunkIndex[0]);"
+    "EmitVertex();"
+    "gl_Position = gl_in[0].gl_Position + vec4(offset, offset, 0.0, 0.0);"
+    "fTexcoord = vec3(1.0, 0.0, gChunkIndex[0]);"
+    "EmitVertex();"
+    "EndPrimitive();"
 "}";
 
 const char *fragment_shader =
 GLSL_VERSION
-"in vec3 Texcoord;"
+"in vec3 fTexcoord;"
 "out vec4 outColor;"
 "uniform sampler2DArray chunk;"
 "void main() {"
-"   outColor = texture(chunk, Texcoord).rrrr;"
+    "outColor = texture(chunk, fTexcoord).rrrr;"
 "}";
 
 #define GL_ERROR_PRINT() \
@@ -40,7 +63,7 @@ GLSL_VERSION
 }
 
 
-GLuint compile_shader_program(const char *vertex_code, const char *fragment_code);
+GLuint compile_shader_program(const char *vertex_code, const char *geometry_code, const char *fragment_code);
 void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
 
@@ -78,14 +101,27 @@ int main() {
     // The textures are mostly persistent in memory. The shaders will have to
     // only draw these textures in a location specified by vertices
     int grid[GRID_WIDTH*GRID_HEIGHT];
-    GLsizei width = 1000;
-    GLsizei height = 1000;
-    GLsizei chunk_count = 1;
-    GLfloat pixels[1000*1000];
+    GLsizei width = 2;
+    GLsizei height = 2;
+    GLsizei chunk_count = 4;
+    GLfloat pixels[] = {
+        1.0, 0.0,
+        0.0, 0.0,
+
+        1.0, 1.0,
+        0.0, 0.0,
+
+        1.0, 1.0,
+        0.0, 1.0,
+
+        1.0, 1.0,
+        1.0, 1.0,
+
+    };
     GLfloat chunk_position_rect[] = {
         -2.0f, -1.0f, 0.4f, 1.0f,
     };
-    compute_mandelbrot_chunk(&chunk_position_rect[0], width, height, &pixels[0]);
+    /* compute_mandelbrot_chunk(&chunk_position_rect[0], width, height, &pixels[0]); */
 
     GLuint chunk;
     glActiveTexture(GL_TEXTURE0);
@@ -96,19 +132,19 @@ int main() {
 
     glTextureParameteri(chunk, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(chunk, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(chunk, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(chunk, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(chunk, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(chunk, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     /* glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, { 1.0f, 0.0f, 0.0f, 1.0f }); */
     // TODO: use a texture mipmap instead
 
     static const GLfloat g_vertex_buffer_data[] = {
-    //  Position        Texcoord
-    //      X      Y       Z      X      Y
-        -0.5f, -0.5f,   1.0f,  0.0f,  1.0f,
-         0.5f, -0.5f,   1.0f,  1.0f,  1.0f,
-         0.5f,  0.5f,   1.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f,   1.0f,  0.0f,  0.0f,
+    //  Position        ChunkIndex
+    //      X      Y     idx
+        -0.5f, -0.5f,   0.0f,
+         0.5f, -0.5f,   1.0f,
+         0.5f,  0.5f,   2.0f,
+        -0.5f,  0.5f,   3.0f,
     };
 
     GLuint vertex_array;
@@ -120,15 +156,15 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
-    GLuint program = compile_shader_program(vertex_shader, fragment_shader);
+    GLuint program = compile_shader_program(vertex_shader, geometry_shader, fragment_shader);
     glUseProgram(program);
 
     GLuint position_attribute = glGetAttribLocation(program, "position");
     glEnableVertexAttribArray(position_attribute);
-    glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
-    GLuint texcoord_attribute = glGetAttribLocation(program, "texcoord");
-    glEnableVertexAttribArray(texcoord_attribute);
-    glVertexAttribPointer(texcoord_attribute, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
+    GLuint chunk_index_attribute = glGetAttribLocation(program, "chunk_index");
+    glEnableVertexAttribArray(chunk_index_attribute);
+    glVertexAttribPointer(chunk_index_attribute, 1, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
 
     glUniform1i(glGetUniformLocation(program, "chunk"), 0);
 
@@ -137,7 +173,7 @@ int main() {
         glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
         /* glDrawArrays(GL_POINTS, 0, 4); */
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glDrawArrays(GL_POINTS, 0, 4);
 
 
         int width, height;
@@ -165,12 +201,14 @@ int main() {
 }
 
 
-GLuint compile_shader_program(const char *vertex_code, const char *fragment_code) {
+GLuint compile_shader_program(const char *vertex_code, const char *geometry_code, const char *fragment_code) {
     GLuint status = GL_FALSE;
     int log_length = 0;
     int vertex_code_len = strlen(vertex_code);
+    int grometry_code_len = strlen(geometry_code);
     int fragment_code_len = strlen(fragment_code);
     GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
+    GLuint geometry_id = glCreateShader(GL_GEOMETRY_SHADER);
     GLuint fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
     // Compile shaders
     fprintf(stderr, "Compiling vertex shader :\n");
@@ -182,6 +220,17 @@ GLuint compile_shader_program(const char *vertex_code, const char *fragment_code
         char *log = (char*)malloc(sizeof(char) * log_length + 1);
         glGetShaderInfoLog(vertex_id, log_length, NULL, log);
         fprintf(stderr, "Compiling vertex shader : %s", log);
+        free(log);
+    }
+    fprintf(stderr, "Compiling geometry shader :\n");
+    glShaderSource(geometry_id, 1, &geometry_code, NULL);
+    glCompileShader(geometry_id);
+    glGetShaderiv(geometry_id, GL_COMPILE_STATUS, &status);
+    glGetShaderiv(geometry_id, GL_INFO_LOG_LENGTH, &log_length);
+    if (log_length > 0) {
+        char *log = (char*)malloc(sizeof(char) * log_length + 1);
+        glGetShaderInfoLog(geometry_id, log_length, NULL, log);
+        fprintf(stderr, "Compiling geometry shader : %s", log);
         free(log);
     }
     fprintf(stderr, "Compiling fragment shader :\n");
@@ -199,6 +248,7 @@ GLuint compile_shader_program(const char *vertex_code, const char *fragment_code
     GLuint program_id = glCreateProgram();
     fprintf(stderr, "Linking program :\n");
     glAttachShader(program_id, vertex_id);
+    glAttachShader(program_id, geometry_id);
     glAttachShader(program_id, fragment_id);
     glLinkProgram(program_id);
 
@@ -212,6 +262,7 @@ GLuint compile_shader_program(const char *vertex_code, const char *fragment_code
 	}
     // Cleanup
 	glDetachShader(program_id, vertex_id);
+	glDetachShader(program_id, geometry_id);
 	glDetachShader(program_id, fragment_id);
 	glDeleteShader(vertex_id);
 	glDeleteShader(fragment_id);
