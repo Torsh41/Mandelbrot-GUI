@@ -12,50 +12,6 @@
 #define GRID_WIDTH 256
 #define GRID_HEIGHT 256
 
-
-#define GLSL_VERSION "#version 460\n"
-const char *vertex_shader =
-GLSL_VERSION
-"in vec2 position;"
-"in float chunk_index;"
-"out float gChunkIndex;"
-"void main() {"
-    "gChunkIndex = chunk_index;"
-    "gl_Position = vec4(position, 0.0, 1.0);"
-"}";
-
-const char *geometry_shader =
-GLSL_VERSION
-"layout (points) in;"
-"layout (triangle_strip, max_vertices = 4) out;"
-"in float gChunkIndex[];"
-"out vec3 fTexcoord;"
-"void main() {"
-    "const float offset = 0.3;"
-    "gl_Position = gl_in[0].gl_Position + vec4(-offset, -offset, 0.0, 0.0);"
-    "fTexcoord = vec3(0.0, 1.0, gChunkIndex[0]);"
-    "EmitVertex();"
-    "gl_Position = gl_in[0].gl_Position + vec4(-offset, offset, 0.0, 0.0);"
-    "fTexcoord = vec3(0.0, 0.0, gChunkIndex[0]);"
-    "EmitVertex();"
-    "gl_Position = gl_in[0].gl_Position + vec4(offset, -offset, 0.0, 0.0);"
-    "fTexcoord = vec3(1.0, 1.0, gChunkIndex[0]);"
-    "EmitVertex();"
-    "gl_Position = gl_in[0].gl_Position + vec4(offset, offset, 0.0, 0.0);"
-    "fTexcoord = vec3(1.0, 0.0, gChunkIndex[0]);"
-    "EmitVertex();"
-    "EndPrimitive();"
-"}";
-
-const char *fragment_shader =
-GLSL_VERSION
-"in vec3 fTexcoord;"
-"out vec4 outColor;"
-"uniform sampler2DArray chunk;"
-"void main() {"
-    "outColor = texture(chunk, fTexcoord).rrrr;"
-"}";
-
 #define GL_ERROR_PRINT() \
 {                        \
     GLenum err = glGetError();  \
@@ -64,6 +20,7 @@ GLSL_VERSION
 
 
 GLuint create_shader(GLenum type, const char *code);
+GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
 void compute_mandelbrot_chunk(const GLfloat position_rect[4], GLsizei width, GLsizei height, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
@@ -156,9 +113,9 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
-    GLuint chunk_vertex_shader = create_shader(GL_VERTEX_SHADER, vertex_shader);
-    GLuint chunk_geometry_shader = create_shader(GL_GEOMETRY_SHADER, geometry_shader);
-    GLuint chunk_fragment_shader = create_shader(GL_FRAGMENT_SHADER, fragment_shader);
+    GLuint chunk_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/chunk.vert");
+    GLuint chunk_geometry_shader = create_shader_from_file(GL_GEOMETRY_SHADER, "shaders/chunk.geom");
+    GLuint chunk_fragment_shader = create_shader_from_file(GL_FRAGMENT_SHADER, "shaders/chunk.frag");
     GLuint program = link_program(chunk_vertex_shader, chunk_geometry_shader, chunk_fragment_shader);
     glUseProgram(program);
 
@@ -224,8 +181,37 @@ GLuint create_shader(GLenum type, const char *code) {
     if (length > 0) {
         char *log = (char*)malloc(sizeof(char) * length + 1);
         glGetShaderInfoLog(id, length, NULL, log);
-        fprintf(stderr, "Compiling shader error log : %s", log);
+        fprintf(stderr, "Compiling shader error log : %s\n", log);
+        fprintf(stderr, ": %s\n", code);
         free(log);
+    }
+    return id;
+}
+
+
+GLuint create_shader_from_file(GLenum type, const char *filename) {
+    char *shader = 0;
+    long length;
+    FILE *f = fopen (filename, "rb");
+    fprintf(stderr, "Loading shader from file :\n");
+    if (f) {
+        fseek (f, 0, SEEK_END);
+        length = ftell(f);
+        fseek (f, 0, SEEK_SET);
+        shader = malloc(length + 1);
+        shader[length] = '\0';
+        if (shader) {
+            fread(shader, 1, length, f);
+        }
+        fclose (f);
+    }
+
+    GLuint id = 0;
+    if (shader) {
+        id = create_shader(type, shader);
+        free(shader);
+    } else {
+        fprintf(stderr, "Loading shader from file : some file error\n");
     }
     return id;
 }
@@ -247,7 +233,7 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 	if (log_length > 0){
         char *log = (char*)malloc(sizeof(char) * log_length + 1);
 		glGetProgramInfoLog(program_id, log_length, NULL, log);
-        fprintf(stderr, "Linking program: %s", log);
+        fprintf(stderr, "Linking program : %s\n", log);
         free(log);
 	}
     // Cleanup
