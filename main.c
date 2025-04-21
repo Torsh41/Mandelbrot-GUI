@@ -154,12 +154,17 @@ int main() {
         KEY_QUIT,
         KEY_ZOOM_IN,
         KEY_ZOOM_OUT,
+        MOUSE_BUTTON_LEFT,
+        MOUSE_POSITION_X,
+        MOUSE_POSITION_Y,
         KEY_ACTION_COUNT
     };
     int key_pressed[KEY_ACTION_COUNT] = { 0 };
+    float mouse_posx, mouse_posy;
     int window_width, window_height;
     glfwGetFramebufferSize(window, &window_width, &window_height);
     int i = 0;
+    // TODO: scroll input event
     while (!glfwWindowShouldClose(window)) {
         // Events handling
         glfwPollEvents();
@@ -215,6 +220,29 @@ int main() {
         } else {
             key_pressed[KEY_ZOOM_OUT] = 0;
         }
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+            double posx, posy;
+            glfwGetCursorPos(window, &posx, &posy);
+            if (!key_pressed[MOUSE_BUTTON_LEFT]) {
+                key_pressed[MOUSE_BUTTON_LEFT] = 1;
+                // also, init MOUSE_POSITION_X and MOUSE_POSITION_Y
+            } else {
+                float dx = posx - mouse_posx;
+                float dy = posy - mouse_posy;
+                window_rec[0] -= dx / window_width * window_rec[2];
+                window_rec[1] += dy / window_height * window_rec[3];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(GLfloat), window_rec);
+            }
+            mouse_posx = posx;
+            mouse_posy = posy;
+        } else {
+            key_pressed[MOUSE_BUTTON_LEFT] = 0;
+        }
+
+
+
+
         printf("%lf, %lf, %lf, %lf;;; ", window_rec[0], window_rec[1], window_rec[2], window_rec[3]);
         printf("%lf, %lf", chunk_size[0], chunk_size[1]);
         printf("\n");
