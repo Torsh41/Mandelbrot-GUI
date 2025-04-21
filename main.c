@@ -109,6 +109,7 @@ int main() {
          0.5f,  0.5f,   2.0f,
         -0.5f,  0.5f,   3.0f,
     };
+    GLfloat chunk_size[2] = { 0.5, 0.5 };
 
     GLuint vertex_array;
     GLuint vertexbuffer;
@@ -117,14 +118,13 @@ int main() {
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
-    GLuint window_rec_buffer;
-    glGenBuffers(1, &window_rec_buffer);
-    glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
-    glBufferData(GL_UNIFORM_BUFFER, 4*sizeof(GLfloat), window_rec, GL_DYNAMIC_DRAW);
+    GLuint shader_data_ubo;
+    glGenBuffers(1, &shader_data_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat) + 2 * sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, shader_data_ubo);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, window_rec_buffer);
-    glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
+    glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat), 2 * sizeof(GLfloat), chunk_size);
 
     // Chunk program config
     GLuint chunk_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/chunk.vert");
@@ -186,8 +186,11 @@ int main() {
                 window_rec[1] += 0.5 * dy;
                 window_rec[2] -= dx;
                 window_rec[3] -= dy;
-                glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
+                chunk_size[0] -= ZOOM_IN * chunk_size[0];
+                chunk_size[1] -= ZOOM_IN * chunk_size[1];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
                 glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
+                glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat), 2 * sizeof(GLfloat), chunk_size);
             }
         } else {
             key_pressed[KEY_ZOOM_IN] = 0;
@@ -203,13 +206,18 @@ int main() {
                 window_rec[1] -= 0.5 * dy;
                 window_rec[2] += dx;
                 window_rec[3] += dy;
-                glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
+                chunk_size[0] += ZOOM_OUT * chunk_size[0];
+                chunk_size[1] += ZOOM_OUT * chunk_size[1];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
                 glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
+                glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat), 2 * sizeof(GLfloat), chunk_size);
             }
         } else {
             key_pressed[KEY_ZOOM_OUT] = 0;
         }
-        printf("%lf, %lf, %lf, %lf\n", window_rec[0], window_rec[1], window_rec[2], window_rec[3]);
+        printf("%lf, %lf, %lf, %lf;;; ", window_rec[0], window_rec[1], window_rec[2], window_rec[3]);
+        printf("%lf, %lf", chunk_size[0], chunk_size[1]);
+        printf("\n");
 
         // Draw
         glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);

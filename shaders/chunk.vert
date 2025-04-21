@@ -6,6 +6,7 @@ out float gChunkIndex;
 
 layout(std140, binding = 0) uniform shader_data {
     vec4 window_rec; // values: { x, y, w, h }
+    vec2 chunk_size; // values: { width, height }
 };
 
 void main() {
