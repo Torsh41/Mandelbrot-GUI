@@ -58,7 +58,7 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // enable vsync
     glfwSetWindowSizeCallback(window, window_size_callback);
-    GLfloat window_rect[4] = { -1.8f, -1.0f, 2.4f, 2.0f };
+    GLfloat window_rec[4] = { -1.8f, -1.0f, 2.4f, 2.0f };
 
     // New New idea:
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
@@ -114,10 +114,17 @@ int main() {
     GLuint vertexbuffer;
     glGenVertexArrays(1, &vertex_array);
     glGenBuffers(1, &vertexbuffer);
-
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
+    GLuint window_rec_buffer;
+    glGenBuffers(1, &window_rec_buffer);
+    glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
+    glBufferData(GL_UNIFORM_BUFFER, 4*sizeof(GLfloat), window_rec, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, window_rec_buffer);
+    glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
 
     // Chunk program config
     GLuint chunk_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/chunk.vert");
@@ -133,6 +140,9 @@ int main() {
     glVertexAttribPointer(chunk_index_attribute, 1, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
     GLuint chunk_array_attribute = glGetUniformLocation(chunk_program, "chunk_array");
     glUniform1i(chunk_array_attribute, 0);
+    GLuint window_rec_index = glGetUniformBlockIndex(chunk_program, "window_rec");
+    glUniformBlockBinding(chunk_program, window_rec_index, 0);
+
 
     // Axis program config
     /* GLuint axis_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/axis.vert"); */
@@ -147,20 +157,21 @@ int main() {
         KEY_ACTION_COUNT
     };
     int key_pressed[KEY_ACTION_COUNT] = { 0 };
+    int window_width, window_height;
+    glfwGetFramebufferSize(window, &window_width, &window_height);
     int i = 0;
     while (!glfwWindowShouldClose(window)) {
-        glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);
-        glClear(GL_COLOR_BUFFER_BIT);
-        /* glDrawArrays(GL_POINTS, 0, 4); */
-        glDrawArrays(GL_POINTS, 0, 4);
-
-
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        glfwSwapBuffers(window);
-
+        // Events handling
         glfwPollEvents();
         /* glfwWaitEvents(); */
+        int curr_window_width, curr_window_height;
+        glfwGetFramebufferSize(window, &curr_window_width, &curr_window_height);
+        if (curr_window_width != window_width || curr_window_height != window_height) {
+            window_rec[2] *= (float)curr_window_width / window_width;
+            window_rec[3] *= (float)curr_window_height / window_height;
+            window_width = curr_window_width;
+            window_height = curr_window_height;
+        }
         if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
             break;
         }
@@ -169,12 +180,14 @@ int main() {
             if (!key_pressed[KEY_ZOOM_IN]) {
                 key_pressed[KEY_ZOOM_IN] = 1;
                 #define ZOOM_IN 0.2 // (1 out of 5)
-                GLfloat dx = ZOOM_IN * window_rect[2];
-                GLfloat dy = ZOOM_IN * window_rect[3];
-                window_rect[0] += 0.5 * dx;
-                window_rect[1] += 0.5 * dy;
-                window_rect[2] -= dx;
-                window_rect[3] -= dy;
+                GLfloat dx = ZOOM_IN * window_rec[2];
+                GLfloat dy = ZOOM_IN * window_rec[3];
+                window_rec[0] += 0.5 * dx;
+                window_rec[1] += 0.5 * dy;
+                window_rec[2] -= dx;
+                window_rec[3] -= dy;
+                glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
             }
         } else {
             key_pressed[KEY_ZOOM_IN] = 0;
@@ -184,17 +197,26 @@ int main() {
             if (!key_pressed[KEY_ZOOM_OUT]) {
                 key_pressed[KEY_ZOOM_OUT] = 1;
                 #define ZOOM_OUT 0.25 // (1 out of 4)
-                GLfloat dx = ZOOM_OUT * window_rect[2];
-                GLfloat dy = ZOOM_OUT * window_rect[3];
-                window_rect[0] -= 0.5 * dx;
-                window_rect[1] -= 0.5 * dy;
-                window_rect[2] += dx;
-                window_rect[3] += dy;
+                GLfloat dx = ZOOM_OUT * window_rec[2];
+                GLfloat dy = ZOOM_OUT * window_rec[3];
+                window_rec[0] -= 0.5 * dx;
+                window_rec[1] -= 0.5 * dy;
+                window_rec[2] += dx;
+                window_rec[3] += dy;
+                glBindBuffer(GL_UNIFORM_BUFFER, window_rec_buffer);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
             }
         } else {
             key_pressed[KEY_ZOOM_OUT] = 0;
         }
-        /* printf("%lf, %lf, %lf, %lf\n", window_rect[0], window_rect[1], window_rect[2], window_rect[3]); */
+        printf("%lf, %lf, %lf, %lf\n", window_rec[0], window_rec[1], window_rec[2], window_rec[3]);
+
+        // Draw
+        glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);
+        glClear(GL_COLOR_BUFFER_BIT);
+        /* glDrawArrays(GL_POINTS, 0, 4); */
+        glDrawArrays(GL_POINTS, 0, 4);
+        glfwSwapBuffers(window);
     }
 
     glDeleteTextures(1, &chunk_array);
