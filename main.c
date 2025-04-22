@@ -434,10 +434,10 @@ void compute_mandelbrot_chunk(const GLfloat pos[2], const GLfloat size[2], GLsiz
 
 #define DEPTH 1000
 GLfloat compute_mandelbrot(GLfloat x, GLfloat xi) {
-    float z = 0.0;
-    float zi = 0.0;
+    long double z = 0.0;
+    long double zi = 0.0;
     for (int i = 1; i < DEPTH; i++) {
-        float zprev = z;
+        long double zprev = z;
         z = z * z - zi * zi;
         zi = 2 * zprev * zi;
         if (z * z + zi * zi < 4) {
