@@ -6,6 +6,8 @@
 #include <string.h>
 #include <math.h>
 
+#include <time.h>
+
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 800
 
@@ -18,6 +20,14 @@
     GLenum err = glGetError();  \
     fprintf(stderr, "OpenGL error: line %d:  %x\n", __LINE__, err); \
 }
+#define BENCHMARK(expr) \
+            { \
+                clock_t start = clock(); \
+                { expr } \
+                clock_t end = clock(); \
+                float ms = (float)(end - start) / CLOCKS_PER_SEC; \
+                printf("seconds: %lf\n", ms); \
+            }
 
 
 GLuint create_shader(GLenum type, const char *code);
@@ -273,23 +283,27 @@ int main() {
         } else {
             // Find vertex with an uninitialized chunk texture
             int counter = 1;
+            int limit = (chunk_count_y + 1) * (chunk_count_x + 1) + 1;
             int vertex_data_offset = 0;
-            for (; counter < (chunk_count_y + 1) * (chunk_count_x + 1) + 1; counter++) {
+            for (; counter < limit; counter++) {
                 vertex_data_offset = (counter - 1) * chunk_vertex_len;
                 if (chunk_vertex_data[vertex_data_offset + 2] == 0.0f) {
                     chunk_vertex_data[vertex_data_offset + 2] = (GLfloat)counter;
                     break;
                 }
             }
-            glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-            glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
-            // TODO: i'm unable to use a more efficient call
-            /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, sizeof(GLfloat), &chunk_vertex_data[vertex_data_offset + 2]); */
-            /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset, chunk_vertex_len * sizeof(GLfloat), &chunk_vertex_data[vertex_data_offset]); */
-            // Calculate the chunk
-            int chunk_pixel_offset = counter * chunk_width * chunk_height;
-            compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
-            glTextureSubImage3D(chunk_array_texture, 0, 0, 0, counter, chunk_width, chunk_height, 1, GL_RED, GL_FLOAT, &chunk_pixel_data[chunk_pixel_offset]);
+            // According to the banchmark, this block can take up to 16ms
+            if (counter != limit) {
+                glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+                glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
+                // TODO: i'm unable to use a more efficient call
+                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, sizeof(GLfloat), &chunk_vertex_data[vertex_data_offset + 2]); */
+                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset, chunk_vertex_len * sizeof(GLfloat), &chunk_vertex_data[vertex_data_offset]); */
+                // Calculate the chunk
+                int chunk_pixel_offset = counter * chunk_width * chunk_height;
+                compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
+                glTextureSubImage3D(chunk_array_texture, 0, 0, 0, counter, chunk_width, chunk_height, 1, GL_RED, GL_FLOAT, &chunk_pixel_data[chunk_pixel_offset]);
+            }
         }
 
         // Draw
@@ -418,7 +432,7 @@ void compute_mandelbrot_chunk(const GLfloat pos[2], const GLfloat size[2], GLsiz
     }
 }
 
-#define DEPTH 500
+#define DEPTH 1000
 GLfloat compute_mandelbrot(GLfloat x, GLfloat xi) {
     float z = 0.0;
     float zi = 0.0;
