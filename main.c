@@ -166,6 +166,7 @@ int main() {
         MOUSE_BUTTON_LEFT,
         MOUSE_POSITION_X,
         MOUSE_POSITION_Y,
+        VERTEX_RECALCULATE,
         KEY_ACTION_COUNT
     };
     int key_pressed[KEY_ACTION_COUNT] = { 0 };
@@ -193,6 +194,7 @@ int main() {
             glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS) {
             if (!key_pressed[KEY_ZOOM_IN]) {
                 key_pressed[KEY_ZOOM_IN] = 1;
+                key_pressed[VERTEX_RECALCULATE] = 1;
                 #define ZOOM_IN 0.2 // (1 out of 5)
                 GLfloat dx = ZOOM_IN * window_rec[2];
                 GLfloat dy = ZOOM_IN * window_rec[3];
@@ -213,6 +215,7 @@ int main() {
             glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) {
             if (!key_pressed[KEY_ZOOM_OUT]) {
                 key_pressed[KEY_ZOOM_OUT] = 1;
+                key_pressed[VERTEX_RECALCULATE] = 1;
                 #define ZOOM_OUT 0.25 // (1 out of 4)
                 GLfloat dx = ZOOM_OUT * window_rec[2];
                 GLfloat dy = ZOOM_OUT * window_rec[3];
@@ -247,6 +250,23 @@ int main() {
             mouse_posy = posy;
         } else {
             key_pressed[MOUSE_BUTTON_LEFT] = 0;
+        }
+        if (key_pressed[VERTEX_RECALCULATE]) {
+            key_pressed[VERTEX_RECALCULATE] = 0;
+            int counter = 1;
+            for (int i = 0; i < chunk_count_y + 1; i++) {
+                for (int j = 0; j < chunk_count_x + 1; j++) {
+                    int vertex_data_offset = (counter - 1) * chunk_vertex_len;
+                    chunk_vertex_data[vertex_data_offset + 0] = window_rec[0] + j * chunk_size[0];
+                    chunk_vertex_data[vertex_data_offset + 1] = window_rec[1] + i * chunk_size[1];
+                    chunk_vertex_data[vertex_data_offset + 2] = (GLfloat)counter;
+                    int chunk_pixel_offset = counter * chunk_width * chunk_height;
+                    compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
+                    counter++;
+                }
+            }
+            glTextureSubImage3D(chunk_array_texture, 0, 0, 0, 0, chunk_width, chunk_height, chunk_count, GL_RED, GL_FLOAT, chunk_pixel_data);
+            glBufferData(GL_ARRAY_BUFFER, chunk_count * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
         }
 
 
