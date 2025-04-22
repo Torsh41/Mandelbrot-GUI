@@ -9,8 +9,9 @@
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 800
 
-#define GRID_WIDTH 256
-#define GRID_HEIGHT 256
+#define CHUNK_WIDTH_PX 50
+#define CHUNK_HEIGHT_PX 50
+#define CHUNK_SIZE_RESERVE_MULTIPLIER 4.0
 
 #define GL_ERROR_PRINT() \
 {                        \
@@ -22,7 +23,7 @@
 GLuint create_shader(GLenum type, const char *code);
 GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
-void compute_mandelbrot_chunk(const GLfloat boundary[4], GLsizei width, GLsizei height, GLfloat *chunk);
+void compute_mandelbrot_chunk(const GLfloat pos[2], const GLfloat size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
 
 
@@ -59,57 +60,64 @@ int main() {
     glfwSwapInterval(1); // enable vsync
     glfwSetWindowSizeCallback(window, window_size_callback);
     GLfloat window_rec[4] = { -1.8f, -1.0f, 2.4f, 2.0f };
-
+    const GLFWvidmode *screen_resolution = glfwGetVideoMode(glfwGetPrimaryMonitor());
     // New New idea:
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
     // The textures are mostly persistent in memory. The shaders will have to
     // only draw these textures in a location specified by vertices
-    GLsizei chunk_width = 2;
-    GLsizei chunk_height = 2;
-    GLsizei chunk_count = 4;
-    GLfloat pixels[] = {
-        1.0, 0.0,
-        0.0, 0.0,
-
-        1.0, 1.0,
-        0.0, 0.0,
-
-        1.0, 1.0,
-        0.0, 1.0,
-
-        1.0, 1.0,
-        1.0, 1.0,
+    // Also, the first "chunk" will be the placeholder texture, that will be
+    // displayed if the acrual texture is not yet calculated
+    const GLsizei chunk_width = CHUNK_WIDTH_PX;
+    const GLsizei chunk_height = CHUNK_HEIGHT_PX;
+    // TODO: calculate chunk count properly. If too many chunks, everything turns black
+    GLsizei chunk_count_x = (int)(screen_resolution->width / chunk_width) + 1 - 6;
+    GLsizei chunk_count_y = (int)(screen_resolution->height / chunk_height) + 1 - 7;
+    const GLsizei chunk_count = (int)(CHUNK_SIZE_RESERVE_MULTIPLIER * chunk_count_x * chunk_count_y);
+    GLfloat chunk_size[2] = {
+        window_rec[2] / chunk_count_x,
+        window_rec[3] / chunk_count_y,
     };
-    GLfloat chunk_boundary[4] = {
-    //      X      Y     w     h
-        -2.0f, -1.0f, 2.4f, 2.0f,
-    };
-    /* compute_mandelbrot_chunk(chunk_boundary, chunk_width, chunk_height, &pixels[0]); */
+    GLsizei chunk_pixel_data_len = chunk_width * chunk_height * chunk_count + 1;
+    GLfloat *chunk_pixel_data = (GLfloat*)malloc(chunk_pixel_data_len * sizeof(chunk_pixel_data[0]));
+    const GLsizei chunk_vertex_len = 3;
+    GLsizei chunk_vertex_data_len = chunk_vertex_len * chunk_count;
+    GLfloat *chunk_vertex_data = (GLfloat*)malloc(chunk_vertex_data_len * sizeof(chunk_vertex_data[0]));
+    // Init gray placeholder texture
+    for (int i = 0; i < chunk_width * chunk_height; i++) {
+        chunk_pixel_data[i] = 0.5f;
+    }
+    // Init vertices
+    for (int i = 0; i < chunk_vertex_len * chunk_count; i++) {
+        chunk_pixel_data[i] = 0.0f;
+    }
+    // Calculate chunk pixel values
+    int counter = 1;
+    for (int i = 0; i < chunk_count_y + 1; i++) {
+        for (int j = 0; j < chunk_count_x + 1; j++) {
+            int vertex_data_offset = (counter - 1) * chunk_vertex_len;
+            chunk_vertex_data[vertex_data_offset + 0] = window_rec[0] + j * chunk_size[0];
+            chunk_vertex_data[vertex_data_offset + 1] = window_rec[1] + i * chunk_size[1];
+            chunk_vertex_data[vertex_data_offset + 2] = (GLfloat)counter;
+            int chunk_pixel_offset = counter * chunk_width * chunk_height;
+            compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
+            counter++;
+        }
+    }
 
-    GLuint chunk_array;
+    GLuint chunk_array_texture;
     glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &chunk_array);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, chunk_array);
-    glTextureStorage3D(chunk_array, 1, GL_R32F, chunk_width, chunk_height, chunk_count);
-    glTextureSubImage3D(chunk_array, 0, 0, 0, 0, chunk_width, chunk_height, chunk_count, GL_RED, GL_FLOAT, &pixels[0]);
+    glGenTextures(1, &chunk_array_texture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, chunk_array_texture);
+    glTextureStorage3D(chunk_array_texture, 1, GL_R32F, chunk_width, chunk_height, chunk_count);
+    glTextureSubImage3D(chunk_array_texture, 0, 0, 0, 0, chunk_width, chunk_height, chunk_count, GL_RED, GL_FLOAT, chunk_pixel_data);
 
-    glTextureParameteri(chunk_array, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(chunk_array, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(chunk_array, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTextureParameteri(chunk_array, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTextureParameteri(chunk_array_texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(chunk_array_texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(chunk_array_texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(chunk_array_texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     /* glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, { 1.0f, 0.0f, 0.0f, 1.0f }); */
     // TODO: use a texture mipmap instead
-
-    static const GLfloat g_vertex_buffer_data[] = {
-    //  Position        ChunkIndex
-    //      X      Y     idx
-        -0.5f, -0.5f,   0.0f,
-         0.5f, -0.5f,   1.0f,
-         0.5f,  0.5f,   2.0f,
-        -0.5f,  0.5f,   3.0f,
-    };
-    GLfloat chunk_size[2] = { 0.5, 0.5 };
 
     GLuint vertex_array;
     GLuint vertexbuffer;
@@ -117,7 +125,7 @@ int main() {
     glGenBuffers(1, &vertexbuffer);
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, chunk_count * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
     GLuint shader_data_ubo;
     glGenBuffers(1, &shader_data_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
@@ -149,6 +157,7 @@ int main() {
     /* GLuint axis_fragment_shader = create_shader_from_file(GL_FRAGMENT_SHADER, "shaders/fragment.vert"); */
     /* GLuint chunk_program = link_program(axis_vertex_shader, 0, axis_fragment_shader); */
     /* glUseProgram(axis_program); */
+
 
     enum key_pressed_idx {
         KEY_QUIT,
@@ -241,8 +250,6 @@ int main() {
         }
 
 
-
-
         printf("%lf, %lf, %lf, %lf;;; ", window_rec[0], window_rec[1], window_rec[2], window_rec[3]);
         printf("%lf, %lf", chunk_size[0], chunk_size[1]);
         printf("\n");
@@ -251,15 +258,21 @@ int main() {
         glClearColor(0.0, 0.0, 0.5 * (1 + sin(i++ * 0.02)), 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
         /* glDrawArrays(GL_POINTS, 0, 4); */
-        glDrawArrays(GL_POINTS, 0, 4);
+        glDrawArrays(GL_POINTS, 0, chunk_count);
         glfwSwapBuffers(window);
     }
 
-    glDeleteTextures(1, &chunk_array);
+    free(chunk_pixel_data);
+    free(chunk_vertex_data);
+    glDeleteTextures(1, &chunk_array_texture);
 
+    glDeleteShader(chunk_vertex_shader);
+    glDeleteShader(chunk_geometry_shader);
+    glDeleteShader(chunk_fragment_shader);
     glDeleteProgram(chunk_program);
     glDeleteBuffers(1, &vertexbuffer);
     glDeleteVertexArrays(1, &vertex_array);
+    glDeleteBuffers(1, &shader_data_ubo);
 
     glfwDestroyWindow(window);
     glfwTerminate();
@@ -355,14 +368,14 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 }
 
 
-void compute_mandelbrot_chunk(const GLfloat boundary[4], GLsizei width, GLsizei height, GLfloat *chunk) {
-    GLfloat step_x = boundary[2] / width;
-    GLfloat step_y = boundary[3] / height;
-    for (int i = 0; i < height; i++) {
-        GLfloat y =  boundary[1] + (i + 0.5) * step_y;
-        for (int j = 0; j < width; j++) {
-            GLfloat x =  boundary[0] + (j + 0.5) * step_x; // 0.5 to center the integration
-            chunk[i * width + j] = compute_mandelbrot(x, y);
+void compute_mandelbrot_chunk(const GLfloat pos[2], const GLfloat size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk) {
+    GLfloat step_x = size[0] / width_px;
+    GLfloat step_y = - size[1] / height_px; // reverse Y axis
+    for (int i = 0; i < height_px; i++) {
+        GLfloat y =  pos[1] + (i + 0.5) * step_y;
+        for (int j = 0; j < width_px; j++) {
+            GLfloat x =  pos[0] + (j + 0.5) * step_x; // 0.5 to center the integration
+            chunk[i * width_px + j] = compute_mandelbrot(x, y);
         }
     }
 }

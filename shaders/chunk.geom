@@ -13,13 +13,13 @@ layout(std140, binding = 0) uniform shader_data {
 
 void main() {
     vec2 ChunkSize = 2 * chunk_size / window_rec.zw;
-    gl_Position = gl_in[0].gl_Position + vec4(0.0, 0.0, 0.0, 0.0);
+    gl_Position = gl_in[0].gl_Position;
     fTexcoord = vec3(0.0, 1.0, gChunkIndex[0]);
     EmitVertex();
-    gl_Position = gl_in[0].gl_Position + vec4(0, ChunkSize.y, 0.0, 0.0);
+    gl_Position = gl_in[0].gl_Position + vec4(0.0, ChunkSize.y, 0.0, 0.0);
     fTexcoord = vec3(0.0, 0.0, gChunkIndex[0]);
     EmitVertex();
-    gl_Position = gl_in[0].gl_Position + vec4(ChunkSize.x, 0, 0.0, 0.0);
+    gl_Position = gl_in[0].gl_Position + vec4(ChunkSize.x, 0.0, 0.0, 0.0);
     fTexcoord = vec3(1.0, 1.0, gChunkIndex[0]);
     EmitVertex();
     gl_Position = gl_in[0].gl_Position + vec4(ChunkSize, 0.0, 0.0);
