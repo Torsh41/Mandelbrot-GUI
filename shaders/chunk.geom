@@ -7,12 +7,12 @@ in float gChunkIndex[];
 out vec3 fTexcoord;
 
 layout(std140, binding = 0) uniform shader_data {
-    vec4 window_rec; // values: { x, y, w, h }
-    vec2 chunk_size; // values: { width, height }
+    dvec4 window_rec; // values: { x, y, w, h }
+    dvec2 chunk_size; // values: { width, height }
 };
 
 void main() {
-    vec2 ChunkSize = 2 * chunk_size / window_rec.zw;
+    vec2 ChunkSize = vec2(2 * chunk_size / window_rec.zw);
     gl_Position = gl_in[0].gl_Position;
     fTexcoord = vec3(0.0, 1.0, gChunkIndex[0]);
     EmitVertex();
