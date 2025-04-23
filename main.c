@@ -33,7 +33,7 @@
 GLuint create_shader(GLenum type, const char *code);
 GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
-void compute_mandelbrot_chunk(const GLfloat pos[2], const GLfloat size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk);
+void compute_mandelbrot_chunk(const GLfloat pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk);
 GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
 
 
@@ -85,7 +85,7 @@ int main() {
     GLsizei chunk_count_x = 16;
     GLsizei chunk_count_y = 16;
     const GLsizei chunk_count = (int)(CHUNK_SIZE_RESERVE_MULTIPLIER * chunk_count_x * chunk_count_y);
-    GLfloat chunk_size[2] = {
+    GLdouble chunk_size[2] = {
         window_rec[2] / chunk_count_x,
         window_rec[3] / chunk_count_y,
     };
@@ -184,7 +184,7 @@ int main() {
         KEY_ACTION_COUNT
     };
     int key_pressed[KEY_ACTION_COUNT] = { 0 };
-    float mouse_posx, mouse_posy;
+    double mouse_posx, mouse_posy;
     int window_width, window_height;
     glfwGetFramebufferSize(window, &window_width, &window_height);
     int i = 0;
@@ -424,7 +424,7 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 }
 
 
-void compute_mandelbrot_chunk(const GLfloat pos[2], const GLfloat size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk) {
+void compute_mandelbrot_chunk(const GLfloat pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk) {
     GLfloat step_x = size[0] / width_px;
     GLfloat step_y = - size[1] / height_px; // reverse Y axis
     for (int i = 0; i < height_px; i++) {
