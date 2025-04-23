@@ -323,30 +323,37 @@ int main() {
             glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
             glBufferData(GL_ARRAY_BUFFER, chunk_vertex_data_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
         } else {
-            // Find vertex with an uninitialized chunk texture
-            int counter = 1;
-            int limit = (chunk_count_y + 1) * (chunk_count_x + 1) + 1;
-            int vertex_data_offset = 0;
-            for (; counter < limit; counter++) {
-                vertex_data_offset = (counter - 1) * chunk_vertex_len;
-                if (chunk_vertex_data[vertex_data_offset + 2] == 0.0f) {
-                    chunk_vertex_data[vertex_data_offset + 2] = (GLdouble)counter;
+            #define DELAY_MAX 0.010f // 10ms
+            clock_t start = clock();
+            // Calculate one or more chunks, if given enougth time per frame
+            while ((float)(clock() - start) / CLOCKS_PER_SEC < DELAY_MAX) {
+                // Find vertex with an uninitialized chunk texture
+                int counter = 1;
+                int limit = (chunk_count_y + 1) * (chunk_count_x + 1) + 1;
+                int vertex_data_offset = 0;
+                for (; counter < limit; counter++) {
+                    vertex_data_offset = (counter - 1) * chunk_vertex_len;
+                    if (chunk_vertex_data[vertex_data_offset + 2] == 0.0f) {
+                        chunk_vertex_data[vertex_data_offset + 2] = (GLdouble)counter;
+                        break;
+                    }
+                }
+                // According to the banchmark, this block can take up to 16ms
+                if (counter != limit) {
+                    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+                    glBufferData(GL_ARRAY_BUFFER, chunk_vertex_data_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
+                    // TODO: i'm unable to use a more efficient call
+                    /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, */
+                    /*         sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset + 2]); */
+                    /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset, */
+                    /*         chunk_vertex_len * sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset]); */
+                    // Calculate the chunk
+                    int chunk_pixel_offset = counter * chunk_width * chunk_height;
+                    compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
+                    glTextureSubImage3D(chunk_array_texture, 0, 0, 0, counter, chunk_width, chunk_height, 1, GL_RED, GL_FLOAT, &chunk_pixel_data[chunk_pixel_offset]);
+                } else {
                     break;
                 }
-            }
-            // According to the banchmark, this block can take up to 16ms
-            if (counter != limit) {
-                glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-                glBufferData(GL_ARRAY_BUFFER, chunk_vertex_data_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
-                // TODO: i'm unable to use a more efficient call
-                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, */
-                /*         sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset + 2]); */
-                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset, */
-                /*         chunk_vertex_len * sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset]); */
-                // Calculate the chunk
-                int chunk_pixel_offset = counter * chunk_width * chunk_height;
-                compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
-                glTextureSubImage3D(chunk_array_texture, 0, 0, 0, counter, chunk_width, chunk_height, 1, GL_RED, GL_FLOAT, &chunk_pixel_data[chunk_pixel_offset]);
             }
         }
 
