@@ -33,7 +33,7 @@
 GLuint create_shader(GLenum type, const char *code);
 GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
-void compute_mandelbrot_chunk(const GLfloat pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk);
+void compute_mandelbrot_chunk(const GLdouble pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk);
 GLfloat compute_mandelbrot(long double x, long double y);
 
 
@@ -93,27 +93,15 @@ int main() {
     GLfloat *chunk_pixel_data = (GLfloat*)malloc(chunk_pixel_data_len * sizeof(chunk_pixel_data[0]));
     const GLsizei chunk_vertex_len = 3;
     GLsizei chunk_vertex_data_len = chunk_vertex_len * chunk_count;
-    GLfloat *chunk_vertex_data = (GLfloat*)malloc(chunk_vertex_data_len * sizeof(chunk_vertex_data[0]));
+    GLdouble *chunk_vertex_data = (GLdouble*)malloc(chunk_vertex_data_len * sizeof(chunk_vertex_data[0]));
     // TODO: gray texture is never displayed???
     // Init gray placeholder texture
     for (int i = 0; i < chunk_width * chunk_height; i++) {
         chunk_pixel_data[i] = 0.5f;
     }
     // Init vertices
-    for (int i = 0; i < chunk_vertex_len * chunk_count; i++) {
+    for (int i = 0; i < chunk_vertex_data_len; i++) {
         chunk_pixel_data[i] = 0.0f;
-    }
-    // Calculate chunk pixel values
-    int counter = 1;
-    for (int i = 0; i < chunk_count_y + 1; i++) {
-        for (int j = 0; j < chunk_count_x + 1; j++) {
-            int vertex_data_offset = (counter - 1) * chunk_vertex_len;
-            chunk_vertex_data[vertex_data_offset + 0] = window_rec[0] + j * chunk_size[0];
-            chunk_vertex_data[vertex_data_offset + 1] = window_rec[1] + i * chunk_size[1];
-            chunk_vertex_data[vertex_data_offset + 2] = (GLfloat)counter;
-            int chunk_pixel_offset = counter * chunk_width * chunk_height;
-            counter++;
-        }
     }
 
     GLuint chunk_array_texture;
@@ -137,7 +125,7 @@ int main() {
     glGenBuffers(1, &vertexbuffer);
     glBindVertexArray(vertex_array);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-    glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, chunk_vertex_data_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
     GLuint shader_data_ubo;
     glGenBuffers(1, &shader_data_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
@@ -154,11 +142,11 @@ int main() {
     glUseProgram(chunk_program);
     GLuint position_attribute = glGetAttribLocation(chunk_program, "position");
     glEnableVertexAttribArray(position_attribute);
-    glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE,
+    glVertexAttribLPointer(position_attribute, 3, GL_DOUBLE,
             chunk_vertex_len * sizeof(chunk_vertex_data[0]), (void*)0);
     GLuint chunk_index_attribute = glGetAttribLocation(chunk_program, "chunk_index");
     glEnableVertexAttribArray(chunk_index_attribute);
-    glVertexAttribPointer(chunk_index_attribute, 1, GL_FLOAT, GL_FALSE,
+    glVertexAttribLPointer(chunk_index_attribute, 3, GL_DOUBLE,
             chunk_vertex_len * sizeof(chunk_vertex_data[0]), (void*)(2 * sizeof(chunk_vertex_data[0])));
     GLuint chunk_array_attribute = glGetUniformLocation(chunk_program, "chunk_array");
     glUniform1i(chunk_array_attribute, 0);
@@ -281,7 +269,7 @@ int main() {
                 }
             }
             glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-            glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, chunk_vertex_data_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
         } else {
             // Find vertex with an uninitialized chunk texture
             int counter = 1;
@@ -290,14 +278,14 @@ int main() {
             for (; counter < limit; counter++) {
                 vertex_data_offset = (counter - 1) * chunk_vertex_len;
                 if (chunk_vertex_data[vertex_data_offset + 2] == 0.0f) {
-                    chunk_vertex_data[vertex_data_offset + 2] = (GLfloat)counter;
+                    chunk_vertex_data[vertex_data_offset + 2] = (GLdouble)counter;
                     break;
                 }
             }
             // According to the banchmark, this block can take up to 16ms
             if (counter != limit) {
                 glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-                glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
+                glBufferData(GL_ARRAY_BUFFER, chunk_vertex_data_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
                 // TODO: i'm unable to use a more efficient call
                 /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, */
                 /*         sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset + 2]); */
@@ -424,7 +412,7 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 }
 
 
-void compute_mandelbrot_chunk(const GLfloat pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk) {
+void compute_mandelbrot_chunk(const GLdouble pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk) {
     long double step_x = size[0] / width_px;
     long double step_y = - size[1] / height_px; // reverse Y axis
     for (int i = 0; i < height_px; i++) {

@@ -1,7 +1,7 @@
 #version 460
 
-in vec2 position;
-in float chunk_index;
+in dvec2 position;
+in double chunk_index;
 out float gChunkIndex;
 
 layout(std140, binding = 0) uniform shader_data {
@@ -10,7 +10,8 @@ layout(std140, binding = 0) uniform shader_data {
 };
 
 void main() {
-    gChunkIndex = chunk_index;
+    gChunkIndex = float(chunk_index);
+    // gChunkIndex = 0.0f;
     // normalize position to (-1, 1), relative to window position
     vec2 p = vec2(2 * (position.xy - window_rec.xy) / window_rec.zw - 1);
     // hide chunks that are uninitialized
