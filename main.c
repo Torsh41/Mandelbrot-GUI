@@ -141,10 +141,10 @@ int main() {
     GLuint shader_data_ubo;
     glGenBuffers(1, &shader_data_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat) + 2 * sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(window_rec[0]) + 2 * sizeof(chunk_size[0]), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, shader_data_ubo);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
-    glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat), 2 * sizeof(GLfloat), chunk_size);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(window_rec[0]), window_rec);
+    glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(window_rec[0]), 2 * sizeof(chunk_size[0]), chunk_size);
 
     // Chunk program config
     GLuint chunk_vertex_shader = create_shader_from_file(GL_VERTEX_SHADER, "shaders/chunk.vert");
@@ -154,10 +154,12 @@ int main() {
     glUseProgram(chunk_program);
     GLuint position_attribute = glGetAttribLocation(chunk_program, "position");
     glEnableVertexAttribArray(position_attribute);
-    glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
+    glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE,
+            chunk_vertex_len * sizeof(chunk_vertex_data[0]), (void*)0);
     GLuint chunk_index_attribute = glGetAttribLocation(chunk_program, "chunk_index");
     glEnableVertexAttribArray(chunk_index_attribute);
-    glVertexAttribPointer(chunk_index_attribute, 1, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
+    glVertexAttribPointer(chunk_index_attribute, 1, GL_FLOAT, GL_FALSE,
+            chunk_vertex_len * sizeof(chunk_vertex_data[0]), (void*)(2 * sizeof(chunk_vertex_data[0])));
     GLuint chunk_array_attribute = glGetUniformLocation(chunk_program, "chunk_array");
     glUniform1i(chunk_array_attribute, 0);
     GLuint window_rec_index = glGetUniformBlockIndex(chunk_program, "window_rec");
@@ -219,8 +221,8 @@ int main() {
                 chunk_size[0] -= ZOOM_IN * chunk_size[0];
                 chunk_size[1] -= ZOOM_IN * chunk_size[1];
                 glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
-                glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
-                glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat), 2 * sizeof(GLfloat), chunk_size);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(window_rec[0]), window_rec);
+                glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(window_rec[0]), 2 * sizeof(chunk_size[0]), chunk_size);
             }
         } else {
             key_pressed[KEY_ZOOM_IN] = 0;
@@ -240,8 +242,8 @@ int main() {
                 chunk_size[0] += ZOOM_OUT * chunk_size[0];
                 chunk_size[1] += ZOOM_OUT * chunk_size[1];
                 glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
-                glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(GLfloat), window_rec);
-                glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(GLfloat), 2 * sizeof(GLfloat), chunk_size);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 4 * sizeof(window_rec[0]), window_rec);
+                glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(window_rec[0]), 2 * sizeof(chunk_size[0]), chunk_size);
             }
         } else {
             key_pressed[KEY_ZOOM_OUT] = 0;
@@ -258,7 +260,7 @@ int main() {
                 window_rec[0] -= dx / window_width * window_rec[2];
                 window_rec[1] += dy / window_height * window_rec[3];
                 glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
-                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(GLfloat), window_rec);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(window_rec[0]), window_rec);
             }
             mouse_posx = posx;
             mouse_posy = posy;
@@ -279,7 +281,7 @@ int main() {
                 }
             }
             glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-            glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(GLfloat), chunk_vertex_data, GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
         } else {
             // Find vertex with an uninitialized chunk texture
             int counter = 1;
@@ -297,8 +299,10 @@ int main() {
                 glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
                 glBufferData(GL_ARRAY_BUFFER, chunk_count * chunk_vertex_len * sizeof(chunk_vertex_data[0]), chunk_vertex_data, GL_DYNAMIC_DRAW);
                 // TODO: i'm unable to use a more efficient call
-                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, sizeof(GLfloat), &chunk_vertex_data[vertex_data_offset + 2]); */
-                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset, chunk_vertex_len * sizeof(GLfloat), &chunk_vertex_data[vertex_data_offset]); */
+                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset + 2, */
+                /*         sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset + 2]); */
+                /* glBufferSubData(GL_ARRAY_BUFFER, vertex_data_offset, */
+                /*         chunk_vertex_len * sizeof(chunk_vertex_data[0]), &chunk_vertex_data[vertex_data_offset]); */
                 // Calculate the chunk
                 int chunk_pixel_offset = counter * chunk_width * chunk_height;
                 compute_mandelbrot_chunk(&chunk_vertex_data[vertex_data_offset], chunk_size, chunk_width, chunk_height, &chunk_pixel_data[chunk_pixel_offset]);
