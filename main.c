@@ -34,7 +34,7 @@ GLuint create_shader(GLenum type, const char *code);
 GLuint create_shader_from_file(GLenum type, const char *filename);
 GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id);
 void compute_mandelbrot_chunk(const GLfloat pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk);
-GLfloat compute_mandelbrot(GLfloat x, GLfloat y);
+GLfloat compute_mandelbrot(long double x, long double y);
 
 
 static void glfw_error_callback(int e, const char *d) {
@@ -425,19 +425,19 @@ GLuint link_program(GLuint vertex_id, GLuint geometry_id, GLuint fragment_id) {
 
 
 void compute_mandelbrot_chunk(const GLfloat pos[2], const GLdouble size[2], GLsizei width_px, GLsizei height_px, GLfloat *chunk) {
-    GLfloat step_x = size[0] / width_px;
-    GLfloat step_y = - size[1] / height_px; // reverse Y axis
+    long double step_x = size[0] / width_px;
+    long double step_y = - size[1] / height_px; // reverse Y axis
     for (int i = 0; i < height_px; i++) {
-        GLfloat y =  pos[1] + (i + 0.5) * step_y;
+        long double y =  pos[1] + (i + 0.5) * step_y;
         for (int j = 0; j < width_px; j++) {
-            GLfloat x =  pos[0] + (j + 0.5) * step_x; // 0.5 to center the integration
+            long double x =  pos[0] + (j + 0.5) * step_x; // 0.5 to center the integration
             chunk[i * width_px + j] = compute_mandelbrot(x, y);
         }
     }
 }
 
 #define DEPTH 1000
-GLfloat compute_mandelbrot(GLfloat x, GLfloat xi) {
+GLfloat compute_mandelbrot(long double x, long double xi) {
     long double z = 0.0;
     long double zi = 0.0;
     for (int i = 1; i < DEPTH; i++) {
