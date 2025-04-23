@@ -195,7 +195,8 @@ int main() {
             window_width = curr_window_width;
             window_height = curr_window_height;
         }
-        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             break;
         }
         if (glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS ||
