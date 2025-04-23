@@ -69,7 +69,7 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // enable vsync
     glfwSetWindowSizeCallback(window, window_size_callback);
-    GLfloat window_rec[4] = { -1.8f, -1.0f, 2.4f, 2.0f };
+    GLdouble window_rec[4] = { -1.8f, -1.0f, 2.4f, 2.0f };
     const GLFWvidmode *screen_resolution = glfwGetVideoMode(glfwGetPrimaryMonitor());
     // New New idea:
     // Generate a pool of textures, then draw stuff onto them pixel by pixel.
@@ -198,8 +198,8 @@ int main() {
         int curr_window_width, curr_window_height;
         glfwGetFramebufferSize(window, &curr_window_width, &curr_window_height);
         if (curr_window_width != window_width || curr_window_height != window_height) {
-            window_rec[2] *= (float)curr_window_width / window_width;
-            window_rec[3] *= (float)curr_window_height / window_height;
+            window_rec[2] *= (double)curr_window_width / window_width;
+            window_rec[3] *= (double)curr_window_height / window_height;
             window_width = curr_window_width;
             window_height = curr_window_height;
         }
@@ -212,8 +212,8 @@ int main() {
                 key_pressed[KEY_ZOOM_IN] = 1;
                 key_pressed[VERTEX_RECALCULATE] = 1;
                 #define ZOOM_IN 0.2 // (1 out of 5)
-                GLfloat dx = ZOOM_IN * window_rec[2];
-                GLfloat dy = ZOOM_IN * window_rec[3];
+                double dx = ZOOM_IN * window_rec[2];
+                double dy = ZOOM_IN * window_rec[3];
                 window_rec[0] += 0.5 * dx;
                 window_rec[1] += 0.5 * dy;
                 window_rec[2] -= dx;
@@ -233,8 +233,8 @@ int main() {
                 key_pressed[KEY_ZOOM_OUT] = 1;
                 key_pressed[VERTEX_RECALCULATE] = 1;
                 #define ZOOM_OUT 0.25 // (1 out of 4)
-                GLfloat dx = ZOOM_OUT * window_rec[2];
-                GLfloat dy = ZOOM_OUT * window_rec[3];
+                double dx = ZOOM_OUT * window_rec[2];
+                double dy = ZOOM_OUT * window_rec[3];
                 window_rec[0] -= 0.5 * dx;
                 window_rec[1] -= 0.5 * dy;
                 window_rec[2] += dx;
@@ -255,8 +255,8 @@ int main() {
                 key_pressed[MOUSE_BUTTON_LEFT] = 1;
                 // also, init MOUSE_POSITION_X and MOUSE_POSITION_Y
             } else {
-                float dx = posx - mouse_posx;
-                float dy = posy - mouse_posy;
+                double dx = posx - mouse_posx;
+                double dy = posy - mouse_posy;
                 window_rec[0] -= dx / window_width * window_rec[2];
                 window_rec[1] += dy / window_height * window_rec[3];
                 glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
