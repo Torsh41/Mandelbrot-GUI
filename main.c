@@ -165,6 +165,7 @@ int main() {
         KEY_QUIT,
         KEY_ZOOM_IN,
         KEY_ZOOM_OUT,
+        KEY_VERTEX_RECALCULATE,
         MOUSE_BUTTON_LEFT,
         MOUSE_POSITION_X,
         MOUSE_POSITION_Y,
@@ -235,6 +236,14 @@ int main() {
             }
         } else {
             key_pressed[KEY_ZOOM_OUT] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+            if (!key_pressed[KEY_VERTEX_RECALCULATE]) {
+                key_pressed[KEY_VERTEX_RECALCULATE] = 1;
+                key_pressed[VERTEX_RECALCULATE] = 1;
+            }
+        } else {
+            key_pressed[KEY_VERTEX_RECALCULATE] = 0;
         }
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
             double posx, posy;
