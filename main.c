@@ -161,14 +161,17 @@ int main() {
     /* glUseProgram(axis_program); */
 
 
+    // All possible UI actions
     enum key_pressed_idx {
         KEY_QUIT,
         KEY_ZOOM_IN,
         KEY_ZOOM_OUT,
+        KEY_MOVE_UP,
+        KEY_MOVE_DOWN,
+        KEY_MOVE_LEFT,
+        KEY_MOVE_RIGHT,
         KEY_VERTEX_RECALCULATE,
         MOUSE_BUTTON_LEFT,
-        MOUSE_POSITION_X,
-        MOUSE_POSITION_Y,
         VERTEX_RECALCULATE,
         KEY_ACTION_COUNT
     };
@@ -245,12 +248,52 @@ int main() {
         } else {
             key_pressed[KEY_VERTEX_RECALCULATE] = 0;
         }
+        #define MOVE_COEF 0.1f
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+            if (!key_pressed[KEY_MOVE_UP]) {
+                key_pressed[KEY_MOVE_UP] = 1;
+                window_rec[1] += MOVE_COEF * window_rec[3];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(window_rec[0]), window_rec);
+            }
+        } else {
+            key_pressed[KEY_MOVE_UP] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+            if (!key_pressed[KEY_MOVE_DOWN]) {
+                key_pressed[KEY_MOVE_DOWN] = 1;
+                window_rec[1] -= MOVE_COEF * window_rec[3];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(window_rec[0]), window_rec);
+            }
+        } else {
+            key_pressed[KEY_MOVE_DOWN] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+            if (!key_pressed[KEY_MOVE_LEFT]) {
+                key_pressed[KEY_MOVE_LEFT] = 1;
+                window_rec[0] -= MOVE_COEF * window_rec[2];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(window_rec[0]), window_rec);
+            }
+        } else {
+            key_pressed[KEY_MOVE_LEFT] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+            if (!key_pressed[KEY_MOVE_RIGHT]) {
+                key_pressed[KEY_MOVE_RIGHT] = 1;
+                window_rec[0] += MOVE_COEF * window_rec[2];
+                glBindBuffer(GL_UNIFORM_BUFFER, shader_data_ubo);
+                glBufferSubData(GL_UNIFORM_BUFFER, 0, 2 * sizeof(window_rec[0]), window_rec);
+            }
+        } else {
+            key_pressed[KEY_MOVE_RIGHT] = 0;
+        }
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
             double posx, posy;
             glfwGetCursorPos(window, &posx, &posy);
             if (!key_pressed[MOUSE_BUTTON_LEFT]) {
                 key_pressed[MOUSE_BUTTON_LEFT] = 1;
-                // also, init MOUSE_POSITION_X and MOUSE_POSITION_Y
             } else {
                 double dx = posx - mouse_posx;
                 double dy = posy - mouse_posy;
